@@ -82,21 +82,65 @@ void RunCommand(int parse_result, Command *cmd) {
 
     Pgm *pgm = cmd->pgm;
 
+    int out = 1;
+
+    Pgm *pgmCounter = pgm;
+    int command_counter = 0;
+    while (pgmCounter != NULL) {
+        command_counter++;
+        pgmCounter = pgmCounter->next;
+    }
+
+    __pid_t* command_pids = malloc(command_counter * sizeof(__pid_t));
+    int curr_command_index = 0;
+
     while (pgm != NULL) {
-
         char **command = pgm->pgmlist;
-
-        __pid_t child = fork();
-        if (child == 0) {
-            execvp(command[0], command);
-        } else {
-            if (!cmd->background) {
-                int *exitcode = 0;
-                waitpid(child, exitcode, WUNTRACED);
+        pgm = pgm->next;
+        int file_descriptor[2];
+        if (pgm != NULL) {
+            int status = pipe(file_descriptor);
+            if (status == -1) {
+                printf("Pipe failed");
+                exit(-1);
             }
         }
 
-        pgm = pgm->next;
+        __pid_t child = fork();
+        command_pids[curr_command_index] = child;
+        curr_command_index++;
+        if (child == 0) {
+            // In child
+            if (pgm != NULL) {
+                // We are piping!
+                close(file_descriptor[1]);
+                dup2(file_descriptor[0], STDIN_FILENO);
+                close(file_descriptor[0]);
+            }
+
+            if (out != 1) {
+                dup2(out, STDOUT_FILENO);
+                close(out);
+            }
+            execvp(command[0], command);
+        } else {
+            // In parent
+            if (out != 1) {
+                close(out);
+            }
+
+            if (pgm != NULL) {
+                close(file_descriptor[0]);
+                out = file_descriptor[1];
+            }
+        }
+    }
+
+    if (!cmd->background) {
+        for (int i = 0; i < command_counter; i++) {
+            int *exitcode = 0;
+            waitpid(command_pids[i], exitcode, WUNTRACED);
+        }
     }
 }
 
