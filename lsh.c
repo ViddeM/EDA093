@@ -23,6 +23,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <wait.h>
+#include <fcntl.h>
 #include "parse.h"
 #include "unistd.h"
 
@@ -82,17 +83,18 @@ void RunCommand(int parse_result, Command *cmd) {
 
     Pgm *pgm = cmd->pgm;
 
-    int out = 1;
-
     Pgm *pgmCounter = pgm;
     int command_counter = 0;
     while (pgmCounter != NULL) {
         command_counter++;
         pgmCounter = pgmCounter->next;
     }
-
     __pid_t* command_pids = malloc(command_counter * sizeof(__pid_t));
     int curr_command_index = 0;
+
+
+
+    int out = 1;
 
     while (pgm != NULL) {
         char **command = pgm->pgmlist;
@@ -121,7 +123,11 @@ void RunCommand(int parse_result, Command *cmd) {
             if (out != 1) {
                 dup2(out, STDOUT_FILENO);
                 close(out);
+            } else if (cmd->rstdout) {
+                int out_pid = open(cmd->rstdout, O_WRONLY | O_CREAT);
+                dup2(out_pid, STDOUT_FILENO);
             }
+
             execvp(command[0], command);
         } else {
             // In parent
