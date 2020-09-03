@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# exit when any command fails
+set -e
+
+
+# [[ $(hostname) =~ remote1[1-2].chalmers.se ]] ||  { echo "You need to compile and test your program at remote11/remote12.chalmers.se before submission!"; exit 1; }
+
+SUBMISSION="lab1-$(whoami)"
+TEMPLATE_URL="https://chalmersuniversity.box.com/shared/static/2f3u2s12nojemrexz7teq4563nnp0y9r.zip "
+TEMPLATE_NAME="lab1-template"
+
+[[ -e $SUBMISSION ]] && rm -r "$SUBMISSION"
+wget -q -O "${TEMPLATE_NAME}.zip" "$TEMPLATE_URL" > /dev/null
+unzip "${TEMPLATE_NAME}.zip"
+mv "$TEMPLATE_NAME" "$SUBMISSION"
+rm "${TEMPLATE_NAME}.zip"
+cd "$SUBMISSION"
+
+make clean > /dev/null
+make
+
+./lsh << EOF
+date
+exit
+EOF
+
+make clean > /dev/null
+
+cd ..
+zip -FSr "${SUBMISSION}.zip" "$SUBMISSION/"
+rm -r "$SUBMISSION"
+echo
+echo "===================================================="
+echo ">> Submission prepared SUCCESSFULLY: ${SUBMISSION}.zip"
+echo ">> Upload to Canvas together with your report!"
+echo "===================================================="
+
