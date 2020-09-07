@@ -24,11 +24,15 @@
 #include <readline/history.h>
 #include <wait.h>
 #include <fcntl.h>
+#include <errno.h>
 #include "parse.h"
 #include "unistd.h"
 
 #define TRUE 1
 #define FALSE 0
+
+int * children;
+void KillChildren(int);
 
 void RunCommand(int, Command *);
 
@@ -41,6 +45,8 @@ void stripwhite(char *);
 char** ParseInput(char*);
 
 int main(void) {
+    signal(SIGINT, SIG_IGN);
+    signal(SIGCHLD,SIG_IGN);
     Command cmd;
     int parse_result;
 
@@ -67,6 +73,15 @@ int main(void) {
     return 0;
 }
 
+int CountCommands(Pgm* pgm) {
+    int counter = 0;
+    while (pgm != NULL) {
+        counter++;
+        pgm = pgm->next;
+    }
+    return counter;
+}
+
 
 #define BUFFERSIZE 80
 
@@ -79,28 +94,22 @@ int main(void) {
  * 2. Remove the debug printing before the final submission.
  */
 void RunCommand(int parse_result, Command *cmd) {
-    DebugPrintCommand(parse_result, cmd);
+    // TODO: remove before submission
+    //DebugPrintCommand(parse_result, cmd);
 
-    Pgm *pgm = cmd->pgm;
+    int command_counter = CountCommands(cmd->pgm);
 
-    Pgm *pgmCounter = pgm;
-    int command_counter = 0;
-    while (pgmCounter != NULL) {
-        command_counter++;
-        pgmCounter = pgmCounter->next;
-    }
     __pid_t* command_pids = malloc(command_counter * sizeof(__pid_t));
+
+    int out = STDOUT_FILENO;
+
     int curr_command_index = 0;
-
-
-
-    int out = 1;
-
-    while (pgm != NULL) {
-        char **command = pgm->pgmlist;
+    Pgm *pgm = cmd->pgm;
+    while (pgm != NULL) { // loop trough commands (right to left)
+        char** command = pgm->pgmlist;
         pgm = pgm->next;
         int file_descriptor[2];
-        if (pgm != NULL) {
+        if (pgm != NULL) { // not last command => piping
             int status = pipe(file_descriptor);
             if (status == -1) {
                 printf("Pipe failed");
@@ -108,29 +117,82 @@ void RunCommand(int parse_result, Command *cmd) {
             }
         }
 
+        if (strcmp("exit", command[0]) == 0) {
+            exit(0);
+        }
         __pid_t child = fork();
-        command_pids[curr_command_index] = child;
-        curr_command_index++;
-        if (child == 0) {
-            // In child
+        if (child == 0) { // In child
             if (pgm != NULL) {
                 // We are piping!
                 close(file_descriptor[1]);
                 dup2(file_descriptor[0], STDIN_FILENO);
                 close(file_descriptor[0]);
+            } else if (cmd->rstdin) { // last command with redirected stdin
+                int input = open(cmd->rstdin, O_RDONLY);
+                if (input == -1) {
+                    switch (errno) {
+                        case EACCES:
+                            printf("Access denied\n");
+                            break;
+                        case EISDIR:
+                            printf("File is a directory\n");
+                            break;
+                        case ENOENT:
+                            printf("No such file\n");
+                            break;
+                        default:
+                            printf("Could not open file\n");
+                            break;
+                    }
+                    break;
+                }
+                dup2(input, STDIN_FILENO);
+                close(input);
             }
 
             if (out != 1) {
                 dup2(out, STDOUT_FILENO);
                 close(out);
             } else if (cmd->rstdout) {
-                int out_pid = open(cmd->rstdout, O_WRONLY | O_CREAT);
+                int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
                 dup2(out_pid, STDOUT_FILENO);
             }
 
-            execvp(command[0], command);
-        } else {
-            // In parent
+            if (strcmp("cd", command[0]) == 0) {
+                int status = chdir(command[1]); // TODO check length
+                if (status == -1) {
+                    switch (errno) {
+                        case EACCES:
+                            printf("Permission denied\n");
+                            break;
+                        case ENOENT:
+                            printf("No such path\n");
+                            break;
+                        case ENOTDIR:
+                            printf("Not a directory\n");
+                            break;
+                        case EFAULT:
+                            printf("Invalid argument\n");
+                            break;
+                        default:
+                            printf("Could not change working directory (%i)\n", errno);
+                            break;
+                    }
+                }
+            } else {
+                execvp(command[0], command);
+                switch (errno) {
+                    case ENOENT:
+                        printf("Could not find executable: %s\n", command[0]);
+                        break;
+                    default:
+                        printf("Failed to execute: %s", command[0]);
+                        break;
+                }
+                exit(0);
+            }
+        } else { // In parent
+            command_pids[curr_command_index] = child;
             if (out != 1) {
                 close(out);
             }
@@ -140,15 +202,31 @@ void RunCommand(int parse_result, Command *cmd) {
                 out = file_descriptor[1];
             }
         }
+
+        curr_command_index++;
     }
 
     if (!cmd->background) {
+        children = command_pids;
+        signal(SIGINT, KillChildren);
         for (int i = 0; i < command_counter; i++) {
             int *exitcode = 0;
             waitpid(command_pids[i], exitcode, WUNTRACED);
+            // TODO do something with exitcode
         }
     }
+    signal(SIGINT, SIG_IGN);
+    free(command_pids);
 }
+
+void KillChildren(int status) {
+    for (int i = 0; i < sizeof(children)/sizeof(__pid_t); i++) {
+        kill(children[i], SIGKILL);
+    }
+    printf("\n");
+}
+
+
 
 /* 
  * Print a Command structure as returned by parse on stdout. 
