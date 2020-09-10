@@ -142,73 +142,87 @@ void handle_command(char** command) {
 
 /* Execute the given command(s). */
 void RunCommand(int parse_result, Command *cmd) {
-    // TODO: remove before submission
-    //DebugPrintCommand(parse_result, cmd);
-
     int command_counter = CountCommands(cmd->pgm);
-
     __pid_t* command_pids = malloc(command_counter * sizeof(__pid_t));
-
-    int prev_out = STDOUT_FILENO;
-
     int curr_command_index = 0;
     Pgm *pgm = cmd->pgm;
+
+    int last_in = STDIN_FILENO; // The input for the last command in the chain. (left-most command)
+    if (cmd->rstdin) {
+        int input = open(cmd->rstdin, O_RDONLY);
+        if (input == -1) {
+            handle_file_error();
+            return; // TODO: Check for memory leaks.
+        } else {
+            last_in = input;
+        }
+    }
+
+    int child_in = STDIN_FILENO;
+    int child_out = STDOUT_FILENO;
+    if (cmd->rstdout) {
+        int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
+        if (out_pid == -1) {
+            handle_file_error();
+            return; // TODO: Check for memory leaks.
+        } else {
+            child_out = out_pid;
+        }
+    }
+
     while (pgm != NULL) { // loop trough commands (right to left)
         char** command = pgm->pgmlist;
         pgm = pgm->next;
         int on_last_command = pgm == NULL;
-        int file_descriptor[2];
-        if (!on_last_command) { // not last command => piping
-            int status = pipe(file_descriptor);
+
+        int pipe_descriptor[2];
+        if (!on_last_command) {
+            int status = pipe(pipe_descriptor);
             if (status == -1) {
                 printf("Pipe failed");
+                // TODO: Make sure we don't have any zombies.
                 exit(-1);
+            } else {
+                child_in = pipe_descriptor[0];
             }
+        } else { // On last command
+            child_in = last_in;
         }
 
         if (strcmp("exit", command[0]) == 0) {
+            // TODO: Cleanup zombies
             exit(0);
         }
         __pid_t child = fork();
         if (child == 0) { // In child
-            if (!on_last_command) {
-                // We are piping!
-                close(file_descriptor[1]);
-                dup2(file_descriptor[0], STDIN_FILENO);
-                close(file_descriptor[0]);
-            } else if (cmd->rstdin) { // last command with redirected stdin
-                int input = open(cmd->rstdin, O_RDONLY);
-                if (input == -1) {
-                    handle_file_error();
-                    break; // Abort processing this command.
-                }
-                dup2(input, STDIN_FILENO);
-                close(input);
+            if (!on_last_command && pipe_descriptor[1] != STDOUT_FILENO) {
+                close(pipe_descriptor[1]);
             }
 
-            if (prev_out != 1) {
-                dup2(prev_out, STDOUT_FILENO);
-                close(prev_out);
-            } else if (cmd->rstdout) {
-                int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
-                if (out_pid == -1) {
-                    handle_file_error();
-                } else {
-                    dup2(out_pid, STDOUT_FILENO);
-                }
+            if (child_in != STDIN_FILENO) {
+                dup2(child_in, STDIN_FILENO);
+                close(child_in);
+            }
+
+            if (child_out != STDOUT_FILENO) {
+                dup2(child_out, STDOUT_FILENO);
+                close(child_out);
             }
 
             handle_command(command);
             exit(0);
         } else { // In parent
-            command_pids[curr_command_index] = child;
-            if (prev_out != 1) {
-                close(prev_out);
+            if (child_in != STDIN_FILENO) {
+                close(child_in);
             }
 
+            if (child_out != STDOUT_FILENO) {
+                close(child_out);
+            }
+
+            command_pids[curr_command_index] = child;
             if (!on_last_command) {
-                close(file_descriptor[0]);
-                prev_out = file_descriptor[1];
+                child_out = pipe_descriptor[1];
             }
         }
 
