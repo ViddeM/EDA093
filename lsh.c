@@ -32,7 +32,9 @@
 #define FALSE 0
 
 int * children;
-void KillChildren(int);
+void KillChildren();
+
+void KillChildrenOnSignal(int);
 
 void RunCommand(int, Command *);
 
@@ -41,6 +43,8 @@ void DebugPrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 
 void stripwhite(char *);
+
+void HandleBackgroundFinish(int);
 
 char** ParseInput(char*);
 
@@ -152,7 +156,10 @@ void RunCommand(int parse_result, Command *cmd) {
         int input = open(cmd->rstdin, O_RDONLY);
         if (input == -1) {
             handle_file_error();
-            return; // TODO: Check for memory leaks.
+
+            // Cleanup and abort.
+            free(command_pids);
+            return;
         } else {
             last_in = input;
         }
@@ -164,7 +171,13 @@ void RunCommand(int parse_result, Command *cmd) {
         int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
         if (out_pid == -1) {
             handle_file_error();
-            return; // TODO: Check for memory leaks.
+
+            // Cleanup and abort.
+            free(command_pids);
+            if (last_in != STDIN_FILENO) {
+                close(last_in);
+            }
+            return;
         } else {
             child_out = out_pid;
         }
@@ -180,8 +193,12 @@ void RunCommand(int parse_result, Command *cmd) {
             int status = pipe(pipe_descriptor);
             if (status == -1) {
                 printf("Pipe failed");
-                // TODO: Make sure we don't have any zombies.
-                exit(-1);
+
+                // Cleanup and break out
+                if (child_out != STDOUT_FILENO) {
+                    close(child_out);
+                }
+                break;
             } else {
                 child_in = pipe_descriptor[0];
             }
@@ -190,7 +207,7 @@ void RunCommand(int parse_result, Command *cmd) {
         }
 
         if (strcmp("exit", command[0]) == 0) {
-            // TODO: Cleanup zombies
+            KillChildren();
             exit(0);
         }
         __pid_t child = fork();
@@ -231,27 +248,30 @@ void RunCommand(int parse_result, Command *cmd) {
 
     if (!cmd->background) {
         children = command_pids;
-        signal(SIGINT, KillChildren);
+        signal(SIGINT, KillChildrenOnSignal);
         for (int i = 0; i < command_counter; i++) {
             int *exitcode = 0;
             waitpid(command_pids[i], exitcode, WUNTRACED);
-            // TODO do something with exitcode
         }
     }
     signal(SIGINT, SIG_IGN);
     free(command_pids);
 }
 
-void KillChildren(int status) {
+void KillChildren() {
     for (int i = 0; i < sizeof(children)/sizeof(__pid_t); i++) {
         kill(children[i], SIGKILL);
     }
     printf("\n");
 }
 
+void KillChildrenOnSignal(int status) {
+    KillChildren();
+}
 
 
-/* 
+
+/*
  * Print a Command structure as returned by parse on stdout. 
  * 
  * Helper function, no need to change. Might be useful to study as inpsiration.
