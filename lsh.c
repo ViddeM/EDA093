@@ -82,63 +82,48 @@ int CountCommands(Pgm* pgm) {
     return counter;
 }
 
-void ExecuteChild() {
-    if (pgm != NULL) {
-        // We are piping!
-        close(file_descriptor[1]);
-        dup2(file_descriptor[0], STDIN_FILENO);
-        close(file_descriptor[0]);
-    } else if (cmd->rstdin) { // last command with redirected stdin
-        int input = open(cmd->rstdin, O_RDONLY);
-        if (input == -1) {
-            switch (errno) {
-                case EACCES:
-                    printf("Access denied\n");
-                    break;
-                case EISDIR:
-                    printf("File is a directory\n");
-                    break;
-                case ENOENT:
-                    printf("No such file\n");
-                    break;
-                default:
-                    printf("Could not open file\n");
-                    break;
-            }
+void handle_file_error() {
+    switch (errno) {
+        case EACCES:
+            printf("Access denied\n");
             break;
-        }
-        dup2(input, STDIN_FILENO);
-        close(input);
+        case EISDIR:
+            printf("File is a directory\n");
+            break;
+        case ENOENT:
+            printf("No such file\n");
+            break;
+        default:
+            printf("Could not open file\n");
+            break;
     }
+}
 
-    if (out != 1) {
-        dup2(out, STDOUT_FILENO);
-        close(out);
-    } else if (cmd->rstdout) {
-        int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
-        dup2(out_pid, STDOUT_FILENO);
+void handle_directory_error() {
+    switch (errno) {
+        case EACCES:
+            printf("Permission denied\n");
+            break;
+        case ENOENT:
+            printf("No such path\n");
+            break;
+        case ENOTDIR:
+            printf("Not a directory\n");
+            break;
+        case EFAULT:
+            printf("Invalid argument\n");
+            break;
+        default:
+            printf("Could not change working directory (%i)\n", errno);
+            break;
     }
+}
 
+void handle_command(char** command) {
     if (strcmp("cd", command[0]) == 0) {
         int status = chdir(command[1]); // TODO check length
         if (status == -1) {
-            switch (errno) {
-                case EACCES:
-                    printf("Permission denied\n");
-                    break;
-                case ENOENT:
-                    printf("No such path\n");
-                    break;
-                case ENOTDIR:
-                    printf("Not a directory\n");
-                    break;
-                case EFAULT:
-                    printf("Invalid argument\n");
-                    break;
-                default:
-                    printf("Could not change working directory (%i)\n", errno);
-                    break;
-            }
+            handle_directory_error();
         }
     } else {
         execvp(command[0], command);
@@ -150,7 +135,6 @@ void ExecuteChild() {
                 printf("Failed to execute: %s", command[0]);
                 break;
         }
-        exit(0);
     }
 }
 
@@ -165,15 +149,16 @@ void RunCommand(int parse_result, Command *cmd) {
 
     __pid_t* command_pids = malloc(command_counter * sizeof(__pid_t));
 
-    int out = STDOUT_FILENO;
+    int prev_out = STDOUT_FILENO;
 
     int curr_command_index = 0;
     Pgm *pgm = cmd->pgm;
     while (pgm != NULL) { // loop trough commands (right to left)
         char** command = pgm->pgmlist;
         pgm = pgm->next;
+        int on_last_command = pgm == NULL;
         int file_descriptor[2];
-        if (pgm != NULL) { // not last command => piping
+        if (!on_last_command) { // not last command => piping
             int status = pipe(file_descriptor);
             if (status == -1) {
                 printf("Pipe failed");
@@ -186,15 +171,44 @@ void RunCommand(int parse_result, Command *cmd) {
         }
         __pid_t child = fork();
         if (child == 0) { // In child
-        } else { // In parent
-            command_pids[curr_command_index] = child;
-            if (out != 1) {
-                close(out);
+            if (!on_last_command) {
+                // We are piping!
+                close(file_descriptor[1]);
+                dup2(file_descriptor[0], STDIN_FILENO);
+                close(file_descriptor[0]);
+            } else if (cmd->rstdin) { // last command with redirected stdin
+                int input = open(cmd->rstdin, O_RDONLY);
+                if (input == -1) {
+                    handle_file_error();
+                    break; // Abort processing this command.
+                }
+                dup2(input, STDIN_FILENO);
+                close(input);
             }
 
-            if (pgm != NULL) {
+            if (prev_out != 1) {
+                dup2(prev_out, STDOUT_FILENO);
+                close(prev_out);
+            } else if (cmd->rstdout) {
+                int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
+                if (out_pid == -1) {
+                    handle_file_error();
+                } else {
+                    dup2(out_pid, STDOUT_FILENO);
+                }
+            }
+
+            handle_command(command);
+            exit(0);
+        } else { // In parent
+            command_pids[curr_command_index] = child;
+            if (prev_out != 1) {
+                close(prev_out);
+            }
+
+            if (!on_last_command) {
                 close(file_descriptor[0]);
-                out = file_descriptor[1];
+                prev_out = file_descriptor[1];
             }
         }
 
