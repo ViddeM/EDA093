@@ -82,17 +82,81 @@ int CountCommands(Pgm* pgm) {
     return counter;
 }
 
+void ExecuteChild() {
+    if (pgm != NULL) {
+        // We are piping!
+        close(file_descriptor[1]);
+        dup2(file_descriptor[0], STDIN_FILENO);
+        close(file_descriptor[0]);
+    } else if (cmd->rstdin) { // last command with redirected stdin
+        int input = open(cmd->rstdin, O_RDONLY);
+        if (input == -1) {
+            switch (errno) {
+                case EACCES:
+                    printf("Access denied\n");
+                    break;
+                case EISDIR:
+                    printf("File is a directory\n");
+                    break;
+                case ENOENT:
+                    printf("No such file\n");
+                    break;
+                default:
+                    printf("Could not open file\n");
+                    break;
+            }
+            break;
+        }
+        dup2(input, STDIN_FILENO);
+        close(input);
+    }
+
+    if (out != 1) {
+        dup2(out, STDOUT_FILENO);
+        close(out);
+    } else if (cmd->rstdout) {
+        int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
+        dup2(out_pid, STDOUT_FILENO);
+    }
+
+    if (strcmp("cd", command[0]) == 0) {
+        int status = chdir(command[1]); // TODO check length
+        if (status == -1) {
+            switch (errno) {
+                case EACCES:
+                    printf("Permission denied\n");
+                    break;
+                case ENOENT:
+                    printf("No such path\n");
+                    break;
+                case ENOTDIR:
+                    printf("Not a directory\n");
+                    break;
+                case EFAULT:
+                    printf("Invalid argument\n");
+                    break;
+                default:
+                    printf("Could not change working directory (%i)\n", errno);
+                    break;
+            }
+        }
+    } else {
+        execvp(command[0], command);
+        switch (errno) {
+            case ENOENT:
+                printf("Could not find executable: %s\n", command[0]);
+                break;
+            default:
+                printf("Failed to execute: %s", command[0]);
+                break;
+        }
+        exit(0);
+    }
+}
 
 #define BUFFERSIZE 80
 
-/* Execute the given command(s).
-
- * Note: The function currently only prints the command(s).
- * 
- * TODO: 
- * 1. Implement this function so that it executes the given command(s).
- * 2. Remove the debug printing before the final submission.
- */
+/* Execute the given command(s). */
 void RunCommand(int parse_result, Command *cmd) {
     // TODO: remove before submission
     //DebugPrintCommand(parse_result, cmd);
@@ -122,75 +186,6 @@ void RunCommand(int parse_result, Command *cmd) {
         }
         __pid_t child = fork();
         if (child == 0) { // In child
-            if (pgm != NULL) {
-                // We are piping!
-                close(file_descriptor[1]);
-                dup2(file_descriptor[0], STDIN_FILENO);
-                close(file_descriptor[0]);
-            } else if (cmd->rstdin) { // last command with redirected stdin
-                int input = open(cmd->rstdin, O_RDONLY);
-                if (input == -1) {
-                    switch (errno) {
-                        case EACCES:
-                            printf("Access denied\n");
-                            break;
-                        case EISDIR:
-                            printf("File is a directory\n");
-                            break;
-                        case ENOENT:
-                            printf("No such file\n");
-                            break;
-                        default:
-                            printf("Could not open file\n");
-                            break;
-                    }
-                    break;
-                }
-                dup2(input, STDIN_FILENO);
-                close(input);
-            }
-
-            if (out != 1) {
-                dup2(out, STDOUT_FILENO);
-                close(out);
-            } else if (cmd->rstdout) {
-                int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
-                dup2(out_pid, STDOUT_FILENO);
-            }
-
-            if (strcmp("cd", command[0]) == 0) {
-                int status = chdir(command[1]); // TODO check length
-                if (status == -1) {
-                    switch (errno) {
-                        case EACCES:
-                            printf("Permission denied\n");
-                            break;
-                        case ENOENT:
-                            printf("No such path\n");
-                            break;
-                        case ENOTDIR:
-                            printf("Not a directory\n");
-                            break;
-                        case EFAULT:
-                            printf("Invalid argument\n");
-                            break;
-                        default:
-                            printf("Could not change working directory (%i)\n", errno);
-                            break;
-                    }
-                }
-            } else {
-                execvp(command[0], command);
-                switch (errno) {
-                    case ENOENT:
-                        printf("Could not find executable: %s\n", command[0]);
-                        break;
-                    default:
-                        printf("Failed to execute: %s", command[0]);
-                        break;
-                }
-                exit(0);
-            }
         } else { // In parent
             command_pids[curr_command_index] = child;
             if (out != 1) {
