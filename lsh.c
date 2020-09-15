@@ -89,16 +89,16 @@ int CountCommands(Pgm* pgm) {
 void handle_file_error() {
     switch (errno) {
         case EACCES:
-            printf("Access denied\n");
+            fprintf(stderr, "Access denied\n");
             break;
         case EISDIR:
-            printf("File is a directory\n");
+            fprintf(stderr, "File is a directory\n");
             break;
         case ENOENT:
-            printf("No such file\n");
+            fprintf(stderr, "No such file\n");
             break;
         default:
-            printf("Could not open file\n");
+            fprintf(stderr, "Could not open file\n");
             break;
     }
 }
@@ -106,19 +106,19 @@ void handle_file_error() {
 void handle_directory_error() {
     switch (errno) {
         case EACCES:
-            printf("Permission denied\n");
+            fprintf(stderr, "Permission denied\n");
             break;
         case ENOENT:
-            printf("No such path\n");
+            fprintf(stderr, "No such path\n");
             break;
         case ENOTDIR:
-            printf("Not a directory\n");
+            fprintf(stderr, "Not a directory\n");
             break;
         case EFAULT:
-            printf("Invalid argument\n");
+            fprintf(stderr, "Invalid argument\n");
             break;
         default:
-            printf("Could not change working directory (%i)\n", errno);
+            fprintf(stderr, "Could not change working directory (%i)\n", errno);
             break;
     }
 }
@@ -133,10 +133,10 @@ void handle_command(char** command) {
         execvp(command[0], command);
         switch (errno) {
             case ENOENT:
-                printf("Could not find executable: %s\n", command[0]);
+                fprintf(stderr, "Could not find executable: %s\n", command[0]);
                 break;
             default:
-                printf("Failed to execute: %s", command[0]);
+                fprintf(stderr, "Failed to execute: %s", command[0]);
                 break;
         }
     }
@@ -192,7 +192,7 @@ void RunCommand(int parse_result, Command *cmd) {
         if (!on_last_command) {
             int status = pipe(pipe_descriptor);
             if (status == -1) {
-                printf("Pipe failed");
+                fprintf(stderr, "Pipe failed");
 
                 // Cleanup and break out
                 if (child_out != STDOUT_FILENO) {
