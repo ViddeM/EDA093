@@ -33,7 +33,6 @@
 
 int * children;
 int numChildren;
-void KillChildren();
 
 void KillChildrenOnSignal(int);
 
@@ -126,7 +125,7 @@ void handle_directory_error() {
 
 void handle_command(char** command) {
     if (strcmp("cd", command[0]) == 0) {
-        int status = chdir(command[1]); // TODO check length
+        int status = chdir(command[1]);
         if (status == -1) {
             handle_directory_error();
         }
@@ -208,7 +207,6 @@ void RunCommand(int parse_result, Command *cmd) {
         }
 
         if (strcmp("exit", command[0]) == 0) {
-            // TODO: Kill background processses ?
             exit(0);
         }
         __pid_t child = fork();
@@ -240,8 +238,6 @@ void RunCommand(int parse_result, Command *cmd) {
                 close(child_out);
             }
 
-            // TODO: REMOVE
-            printf("Setting child id for '%i' to '%i'\n", curr_command_index, child);
             command_pids[curr_command_index] = child;
 
             if (!on_last_command) {
@@ -266,14 +262,10 @@ void RunCommand(int parse_result, Command *cmd) {
     free(command_pids);
 }
 
-void KillChildren() {
+void KillChildrenOnSignal(int status) {
     for (int i = 0; i < numChildren; i++) {
         kill(children[i], SIGKILL);
     }
-}
-
-void KillChildrenOnSignal(int status) {
-    KillChildren();
 }
 
 
