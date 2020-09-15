@@ -32,6 +32,7 @@
 #define FALSE 0
 
 int * children;
+int numChildren;
 void KillChildren();
 
 void KillChildrenOnSignal(int);
@@ -207,11 +208,13 @@ void RunCommand(int parse_result, Command *cmd) {
         }
 
         if (strcmp("exit", command[0]) == 0) {
-            KillChildren();
+            // TODO: Kill background processses ?
             exit(0);
         }
         __pid_t child = fork();
         if (child == 0) { // In child
+            signal(SIGINT, SIG_IGN);
+
             if (!on_last_command && pipe_descriptor[1] != STDOUT_FILENO) {
                 close(pipe_descriptor[1]);
             }
@@ -237,7 +240,10 @@ void RunCommand(int parse_result, Command *cmd) {
                 close(child_out);
             }
 
+            // TODO: REMOVE
+            printf("Setting child id for '%i' to '%i'\n", curr_command_index, child);
             command_pids[curr_command_index] = child;
+
             if (!on_last_command) {
                 child_out = pipe_descriptor[1];
             }
@@ -248,21 +254,22 @@ void RunCommand(int parse_result, Command *cmd) {
 
     if (!cmd->background) {
         children = command_pids;
+        numChildren = command_counter;
         signal(SIGINT, KillChildrenOnSignal);
         for (int i = 0; i < command_counter; i++) {
             int *exitcode = 0;
             waitpid(command_pids[i], exitcode, WUNTRACED);
         }
+        numChildren = 0;
+        signal(SIGINT, SIG_IGN);
     }
-    signal(SIGINT, SIG_IGN);
     free(command_pids);
 }
 
 void KillChildren() {
-    for (int i = 0; i < sizeof(children)/sizeof(__pid_t); i++) {
+    for (int i = 0; i < numChildren; i++) {
         kill(children[i], SIGKILL);
     }
-    printf("\n");
 }
 
 void KillChildrenOnSignal(int status) {
