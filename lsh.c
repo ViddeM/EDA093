@@ -253,10 +253,13 @@ void RunCommand(int parse_result, Command *cmd) {
         children = command_pids;
         numChildren = command_counter;
         signal(SIGINT, KillChildrenOnSignal);
-        for (int i = 0; i < command_counter; i++) {
+        int i = 0;
+        while (i < command_counter) {
             int *exitcode = 0;
             waitpid(command_pids[i], exitcode, WUNTRACED);
+            i++;
         }
+
         numChildren = 0;
         signal(SIGINT, SIG_IGN);
     }
@@ -264,8 +267,10 @@ void RunCommand(int parse_result, Command *cmd) {
 }
 
 void KillChildrenOnSignal(int status) {
-    for (int i = 0; i < numChildren; i++) {
+    int i = 0;
+    while (i < numChildren) {
         kill(children[i], SIGKILL);
+        i++;
     }
 }
 
