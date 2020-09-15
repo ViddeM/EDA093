@@ -124,21 +124,14 @@ void handle_directory_error() {
 }
 
 void handle_command(char** command) {
-    if (strcmp("cd", command[0]) == 0) {
-        int status = chdir(command[1]);
-        if (status == -1) {
-            handle_directory_error();
-        }
-    } else {
-        execvp(command[0], command);
-        switch (errno) {
-            case ENOENT:
-                fprintf(stderr, "Could not find executable: %s\n", command[0]);
-                break;
-            default:
-                fprintf(stderr, "Failed to execute: %s", command[0]);
-                break;
-        }
+    execvp(command[0], command);
+    switch (errno) {
+        case ENOENT:
+            fprintf(stderr, "Could not find executable: %s\n", command[0]);
+            break;
+        default:
+            fprintf(stderr, "Failed to execute: %s", command[0]);
+            break;
     }
 }
 
@@ -206,42 +199,50 @@ void RunCommand(int parse_result, Command *cmd) {
             child_in = last_in;
         }
 
+
         if (strcmp("exit", command[0]) == 0) {
             exit(0);
-        }
-        __pid_t child = fork();
-        if (child == 0) { // In child
-            signal(SIGINT, SIG_IGN);
-
-            if (!on_last_command && pipe_descriptor[1] != STDOUT_FILENO) {
-                close(pipe_descriptor[1]);
+        } else if (strcmp("cd", command[0]) == 0) {
+            int status = chdir(command[1]);
+            if (status == -1) {
+                handle_directory_error();
             }
+            command_counter = 0; // To avoid killing random processes
+        } else {
+            __pid_t child = fork();
+            if (child == 0) { // In child
+                signal(SIGINT, SIG_IGN);
 
-            if (child_in != STDIN_FILENO) {
-                dup2(child_in, STDIN_FILENO);
-                close(child_in);
-            }
+                if (!on_last_command && pipe_descriptor[1] != STDOUT_FILENO) {
+                    close(pipe_descriptor[1]);
+                }
 
-            if (child_out != STDOUT_FILENO) {
-                dup2(child_out, STDOUT_FILENO);
-                close(child_out);
-            }
+                if (child_in != STDIN_FILENO) {
+                    dup2(child_in, STDIN_FILENO);
+                    close(child_in);
+                }
 
-            handle_command(command);
-            exit(0);
-        } else { // In parent
-            if (child_in != STDIN_FILENO) {
-                close(child_in);
-            }
+                if (child_out != STDOUT_FILENO) {
+                    dup2(child_out, STDOUT_FILENO);
+                    close(child_out);
+                }
 
-            if (child_out != STDOUT_FILENO) {
-                close(child_out);
-            }
+                handle_command(command);
+                exit(0);
+            } else { // In parent
+                if (child_in != STDIN_FILENO) {
+                    close(child_in);
+                }
 
-            command_pids[curr_command_index] = child;
+                if (child_out != STDOUT_FILENO) {
+                    close(child_out);
+                }
 
-            if (!on_last_command) {
-                child_out = pipe_descriptor[1];
+                command_pids[curr_command_index] = child;
+
+                if (!on_last_command) {
+                    child_out = pipe_descriptor[1];
+                }
             }
         }
 
