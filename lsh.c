@@ -77,6 +77,9 @@ int main(void) {
     return 0;
 }
 
+/*
+ * Counts the number of commands in Pgm* list
+ */
 int CountCommands(Pgm* pgm) {
     int counter = 0;
     while (pgm != NULL) {
@@ -86,6 +89,11 @@ int CountCommands(Pgm* pgm) {
     return counter;
 }
 
+/*
+ * Handle potential errors from open
+ *
+ * Provides helpful error messages for most common scenarios
+ */
 void handle_file_error() {
     switch (errno) {
         case EACCES:
@@ -103,6 +111,11 @@ void handle_file_error() {
     }
 }
 
+/*
+ * Handle potential errors from chdir
+ *
+ * Provides helpful error messages for most common scenarios
+ */
 void handle_directory_error() {
     switch (errno) {
         case EACCES:
@@ -123,6 +136,9 @@ void handle_directory_error() {
     }
 }
 
+/*
+ * Execute the command and handle potential errors
+ */
 void handle_command(char** command) {
     execvp(command[0], command);
     switch (errno) {
@@ -145,6 +161,7 @@ void RunCommand(int parse_result, Command *cmd) {
     Pgm *pgm = cmd->pgm;
 
     int last_in = STDIN_FILENO; // The input for the last command in the chain. (left-most command)
+    // Open file for redirected input and set file descriptor as input for last (left-most) command
     if (cmd->rstdin) {
         int input = open(cmd->rstdin, O_RDONLY);
         if (input == -1) {
@@ -160,6 +177,7 @@ void RunCommand(int parse_result, Command *cmd) {
 
     int child_in = STDIN_FILENO;
     int child_out = STDOUT_FILENO;
+    // Open file for redirected output
     if (cmd->rstdout) {
         int out_pid = creat(cmd->rstdout, S_IRGRP | S_IRUSR | S_IWUSR | S_IWGRP | S_IROTH);
         if (out_pid == -1) {
@@ -172,6 +190,7 @@ void RunCommand(int parse_result, Command *cmd) {
             }
             return;
         } else {
+            // Set the first output to the opened file
             child_out = out_pid;
         }
     }
@@ -182,7 +201,7 @@ void RunCommand(int parse_result, Command *cmd) {
         int on_last_command = pgm == NULL;
 
         int pipe_descriptor[2];
-        if (!on_last_command) {
+        if (!on_last_command) { // Sutup pipe if we are not on last command
             int status = pipe(pipe_descriptor);
             if (status == -1) {
                 fprintf(stderr, "Pipe failed");
@@ -199,7 +218,7 @@ void RunCommand(int parse_result, Command *cmd) {
             child_in = last_in;
         }
 
-
+        // Built in commands
         if (strcmp("exit", command[0]) == 0) {
             exit(0);
         } else if (strcmp("cd", command[0]) == 0) {
@@ -208,13 +227,13 @@ void RunCommand(int parse_result, Command *cmd) {
                 handle_directory_error();
             }
             command_counter = 0; // To avoid killing random processes
-        } else {
+        } else { // Not built in command
             __pid_t child = fork();
             if (child == 0) { // In child
                 signal(SIGINT, SIG_IGN);
 
                 if (!on_last_command && pipe_descriptor[1] != STDOUT_FILENO) {
-                    close(pipe_descriptor[1]);
+                    close(pipe_descriptor[1]); // close write end of new pipe in child
                 }
 
                 if (child_in != STDIN_FILENO) {
@@ -241,7 +260,7 @@ void RunCommand(int parse_result, Command *cmd) {
                 command_pids[curr_command_index] = child;
 
                 if (!on_last_command) {
-                    child_out = pipe_descriptor[1];
+                    child_out = pipe_descriptor[1]; // set output of next command to write end of pipe
                 }
             }
         }
@@ -265,7 +284,11 @@ void RunCommand(int parse_result, Command *cmd) {
     }
     free(command_pids);
 }
-
+/*
+ * Signal handler
+ *
+ * Send kill signal to all children in global children variable
+ */
 void KillChildrenOnSignal(int status) {
     int i = 0;
     while (i < numChildren) {
