@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ba98b7b4-f934-44c6-a807-83c89c543ab5" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/pintos/src/utils/backtrace" beforeDir="false" afterPath="$PROJECT_DIR$/pintos/src/utils/backtrace" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pintos/src/utils/pintos" beforeDir="false" afterPath="$PROJECT_DIR$/pintos/src/utils/pintos" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pintos/src/utils/pintos-gdb" beforeDir="false" afterPath="$PROJECT_DIR$/pintos/src/utils/pintos-gdb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pintos/src/utils/pintos-mkdisk" beforeDir="false" afterPath="$PROJECT_DIR$/pintos/src/utils/pintos-mkdisk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pintos/src/utils/pintos-set-cmdline" beforeDir="false" afterPath="$PROJECT_DIR$/pintos/src/utils/pintos-set-cmdline" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectId" id="1hrfh3stTi2IiT2CNiCqFjxb7dS" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../lab1" />
+    <property name="settings.editor.selected.configurable" value="CPPToolchains" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ba98b7b4-f934-44c6-a807-83c89c543ab5" name="Default Changelist" comment="" />
+      <created>1600774247215</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1600774247215</updated>
+      <workItem from="1600774248250" duration="550000" />
+      <workItem from="1600775567853" duration="113000" />
+      <workItem from="1600776791727" duration="962000" />
+      <workItem from="1600945352454" duration="22000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="531" y="54" key="#SSH_Configurations" timestamp="1600777110103">
+      <screen x="0" y="0" width="1920" height="1048" />
+    </state>
+    <state x="531" y="54" key="#SSH_Configurations/0.0.1920.1048@0.0.1920.1048" timestamp="1600777110103" />
+    <state x="415" y="97" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1600776796993">
+      <screen x="0" y="0" width="1920" height="1048" />
+    </state>
+    <state x="415" y="97" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1048@0.0.1920.1048" timestamp="1600776796993" />
+    <state x="742" y="225" key="FileChooserDialogImpl" timestamp="1600945372707">
+      <screen x="0" y="0" width="1920" height="1048" />
+    </state>
+    <state x="742" y="225" key="FileChooserDialogImpl/0.0.1920.1048@0.0.1920.1048" timestamp="1600945372707" />
+    <state x="453" y="69" width="1001" height="760" key="SettingsEditor" timestamp="1600777289016">
+      <screen x="0" y="0" width="1920" height="1048" />
+    </state>
+    <state x="453" y="69" width="1001" height="760" key="SettingsEditor/0.0.1920.1048@0.0.1920.1048" timestamp="1600777289016" />
+  </component>
+</project>

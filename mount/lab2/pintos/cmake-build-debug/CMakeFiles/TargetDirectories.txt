@@ -1,0 +1,3 @@
+/home/vidde/Documents/chalmers/eda093/mount/lab2/pintos/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/vidde/Documents/chalmers/eda093/mount/lab2/pintos/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/vidde/Documents/chalmers/eda093/mount/lab2/pintos/cmake-build-debug/CMakeFiles/pintos.dir

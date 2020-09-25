@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/vidde/Documents/chalmers/EDA093/lsh.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+ctype.h
+-
+readline/readline.h
+-
+readline/history.h
+-
+wait.h
+-
+fcntl.h
+-
+errno.h
+-
+parse.h
+/home/vidde/Documents/chalmers/EDA093/parse.h
+unistd.h
+/home/vidde/Documents/chalmers/EDA093/unistd.h
+
+/home/vidde/Documents/chalmers/EDA093/parse.c
+stdio.h
+-
+string.h
+-
+ctype.h
+-
+parse.h
+/home/vidde/Documents/chalmers/EDA093/parse.h
+
+/home/vidde/Documents/chalmers/EDA093/parse.h
+

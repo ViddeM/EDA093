@@ -1,0 +1,1 @@
+/usr/bin/cc -g   CMakeFiles/EDA093.dir/lsh.c.o CMakeFiles/EDA093.dir/parse.c.o  -o EDA093 
