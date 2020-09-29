@@ -32,6 +32,8 @@ struct thread_alarms {
 
 struct thread_alarms *alarm_list;
 
+static struct lock* alarm_lock;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -51,6 +53,8 @@ static void real_time_delay(int64_t num, int32_t denom);
 void timer_init(void) {
     pit_configure_channel(0, 2, TIMER_FREQ);
     intr_register_ext(0x20, timer_interrupt, "8254 Timer");
+    alarm_lock = malloc(sizeof(struct lock));
+    lock_init(alarm_lock);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -106,14 +110,17 @@ void timer_sleep(int64_t sleep_ticks) {
     new_alarms->alarm.alarm_time = start + sleep_ticks;
     new_alarms->alarm.thread = thread_current();
 
-    intr_set_level(INTR_OFF);
+    lock_acquire(alarm_lock);
+
     new_alarms->next = alarm_list;
     alarm_list = new_alarms;
+    lock_release(alarm_lock);
 
-    ASSERT (intr_get_level() == INTR_OFF);
+    intr_set_level(INTR_OFF);
     thread_block();
+    intr_set_level(INTR_ON);
 
-    ASSERT(intr_get_level() == INTR_OFF);
+    lock_acquire(alarm_lock);
 
     struct thread_alarms* prev = NULL;
     struct thread_alarms *curr = alarm_list;
@@ -131,7 +138,7 @@ void timer_sleep(int64_t sleep_ticks) {
         }
         curr = next;
     }
-    intr_set_level(INTR_ON);
+    lock_release(alarm_lock);
     free(curr);
 }
 
