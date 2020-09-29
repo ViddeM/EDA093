@@ -124,7 +124,10 @@ void timer_sleep(int64_t sleep_ticks) {
     lock_acquire(alarm_lock);
     list_remove(&new_alarm->elem);
     lock_release(alarm_lock);
+
+    intr_set_level(INTR_OFF);
     free(new_alarm);
+    intr_set_level(INTR_ON);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -192,6 +195,7 @@ void timer_print_stats(void) {
 void check_alarm(struct thread* t, void* aux) {
     struct list_elem* curr;
     // Loop trough alarms
+
     for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list); curr = list_next (curr)) {
         // Extract alarm
         struct thread_alarm *alarm = list_entry(curr, struct thread_alarm, elem);
