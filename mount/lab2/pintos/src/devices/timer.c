@@ -7,6 +7,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include <threads/malloc.h>
+#include <lib/kernel/list.h>
 
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -21,16 +22,12 @@
 static int64_t ticks;
 
 struct thread_alarm {
-    struct thread *thread;
+    struct list_elem elem;
+    struct thread* thread;
     uint32_t alarm_time;
 };
 
-struct thread_alarms {
-    struct thread_alarm alarm;
-    struct thread_alarms *next;
-};
-
-struct thread_alarms *alarm_list;
+struct list alarm_list;
 
 static struct lock* alarm_lock;
 
@@ -55,6 +52,7 @@ void timer_init(void) {
     intr_register_ext(0x20, timer_interrupt, "8254 Timer");
     alarm_lock = malloc(sizeof(struct lock));
     lock_init(alarm_lock);
+    list_init(&alarm_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -106,14 +104,12 @@ void timer_sleep(int64_t sleep_ticks) {
     // set the thread state to blocked
     int64_t start = timer_ticks();
 
-    struct thread_alarms *new_alarms = malloc(sizeof(struct thread_alarms));
-    new_alarms->alarm.alarm_time = start + sleep_ticks;
-    new_alarms->alarm.thread = thread_current();
+    struct thread_alarm* new_alarm = malloc(sizeof(struct thread_alarm));
+    new_alarm->alarm_time = start + sleep_ticks;
+    new_alarm->thread = thread_current();
 
     lock_acquire(alarm_lock);
-
-    new_alarms->next = alarm_list;
-    alarm_list = new_alarms;
+    list_push_back(&alarm_list, new_alarm);
     lock_release(alarm_lock);
 
     intr_set_level(INTR_OFF);
@@ -121,25 +117,9 @@ void timer_sleep(int64_t sleep_ticks) {
     intr_set_level(INTR_ON);
 
     lock_acquire(alarm_lock);
-
-    struct thread_alarms* prev = NULL;
-    struct thread_alarms *curr = alarm_list;
-    while (curr != NULL) {
-        struct thread_alarms *next = curr->next;
-        if (new_alarms == curr) {
-            if (prev == NULL) {
-                alarm_list = next;
-            } else {
-                prev->next = next;
-            }
-            break;
-        } else {
-            prev = curr;
-        }
-        curr = next;
-    }
+    list_remove(&new_alarm->elem);
     lock_release(alarm_lock);
-    free(curr);
+    free(new_alarm);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -205,12 +185,14 @@ void timer_print_stats(void) {
 }
 
 void check_alarm(struct thread* t, void* aux) {
-    struct thread_alarms* curr = alarm_list;
-    while (curr != NULL) {
-        if (curr->alarm.thread->tid == t->tid && curr->alarm.alarm_time <= ticks && t->status == THREAD_BLOCKED) {
+    struct list_elem* curr;
+    for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list);
+         curr = list_next (curr))
+    {
+        struct thread_alarm *alarm = list_entry(curr, struct thread_alarm, elem);
+        if (alarm->thread->tid == t->tid && alarm->alarm_time <= ticks && t->status == THREAD_BLOCKED) {
             thread_unblock(t);
         }
-        curr = curr->next;
     }
 }
 
