@@ -91,15 +91,19 @@ int64_t timer_elapsed(int64_t then) {
     return timer_ticks() - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
+/* Sleeps for approximately TICKS timer sleep_ticks.  Interrupts must
    be turned on. */
-void timer_sleep(int64_t ticks) {
-    // store our pid and current tick and ticks somewhere
+void timer_sleep(int64_t sleep_ticks) {
+    if (sleep_ticks <= 0) {
+        return;
+    }
+
+    // store our pid and current tick and sleep_ticks somewhere
     // set the thread state to blocked
     int64_t start = timer_ticks();
 
     struct thread_alarms *new_alarms = malloc(sizeof(struct thread_alarms));
-    new_alarms->alarm.alarm_time = start + ticks;
+    new_alarms->alarm.alarm_time = start + sleep_ticks;
     new_alarms->alarm.thread = thread_current();
 
     intr_set_level(INTR_OFF);
@@ -196,7 +200,7 @@ void timer_print_stats(void) {
 void check_alarm(struct thread* t, void* aux) {
     struct thread_alarms* curr = alarm_list;
     while (curr != NULL) {
-        if (curr->alarm.thread->tid == t->tid && curr->alarm.alarm_time == ticks && t->status == THREAD_BLOCKED) {
+        if (curr->alarm.thread->tid == t->tid && curr->alarm.alarm_time <= ticks && t->status == THREAD_BLOCKED) {
             thread_unblock(t);
         }
         curr = curr->next;
