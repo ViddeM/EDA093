@@ -125,9 +125,10 @@ void timer_sleep(int64_t sleep_ticks) {
     list_remove(&new_alarm->elem);
     lock_release(alarm_lock);
 
-    intr_set_level(INTR_OFF);
+    // TODO: Ask supervisor if these are needed / can other threads run while an interrupt is active.
+//    intr_set_level(INTR_OFF);
     free(new_alarm);
-    intr_set_level(INTR_ON);
+//    intr_set_level(INTR_ON);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
