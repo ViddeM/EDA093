@@ -10,7 +10,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0cf128a-5c49-4fff-a256-cf3b9d8191fd" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/devices/timer.c" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/devices/timer.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/backtrace" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/backtrace" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-gdb" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-gdb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-mkdisk" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-mkdisk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-set-cmdline" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-set-cmdline" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,5 +60,9 @@
       <screen x="0" y="0" width="1920" height="1048" />
     </state>
     <state x="75" y="83" key="#C/C++/0.0.1920.1048@0.0.1920.1048" timestamp="1601387714308" />
+    <state x="647" y="269" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1601631241811">
+      <screen x="0" y="0" width="1920" height="1048" />
+    </state>
+    <state x="647" y="269" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1920.1048@0.0.1920.1048" timestamp="1601631241811" />
   </component>
 </project>
