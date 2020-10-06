@@ -22,16 +22,15 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-/* Struct to keep track of thread alarms */
-struct thread_alarm {
+/* A thread waiting to be woken up */
+struct sleeping_thread {
   struct list_elem elem; // to be used with lib/kernel/list.h
   struct thread* thread;
 };
 
-/* List of alarms and a related lock for modifying the list */
-struct list alarm_list;
+/* List of the sleeping threads and a related lock for modifying the list */
+struct list sleeping_threads;
 static struct lock* alarm_lock;
-
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -52,7 +51,7 @@ timer_init (void)
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
   alarm_lock = malloc (sizeof (struct lock));
   lock_init (alarm_lock);
-  list_init (&alarm_list);
+  list_init (&sleeping_threads);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -106,39 +105,38 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t sleep_ticks)
 {
-  // Don't do anything if alarm isn't in future
-  if (sleep_ticks <= 0) {
+  // Don't do anything if alarm isn't in future.
+  if (sleep_ticks <= 0)
+  {
       return;
   }
 
-  // Save start time before malloc to get a more accurate timing
+  // Save start time before malloc to get a more accurate timing.
   int64_t start = timer_ticks ();
 
-  // Create a new alarm
-  struct thread_alarm* new_alarm = malloc (sizeof (struct thread_alarm));
-  new_alarm->thread = thread_current ();
-  new_alarm->thread->alarm_tick = start + sleep_ticks;
+  // Create a list entry for this thread.
+  struct sleeping_thread* new_sleeping_thread = malloc (sizeof (struct sleeping_thread));
+  new_sleeping_thread->thread = thread_current ();
+  new_sleeping_thread->thread->alarm_tick = start + sleep_ticks;
 
-  // Add alarm to alarm list
+  // Block and add list entry to the list of sleeping threads.
   lock_acquire (alarm_lock);
-  list_push_back (&alarm_list, new_alarm);
+  list_push_back (&sleeping_threads, new_sleeping_thread);
   lock_release (alarm_lock);
 
-  // Block the thread
+  // Block the thread.
   intr_set_level (INTR_OFF);
   thread_block ();
   intr_set_level (INTR_ON);
 
-  // Remove alarm from alarm list and free memory after wakeup.
+  // Remove the entry from the list.
   lock_acquire (alarm_lock);
-  list_remove (&new_alarm->elem);
+  list_remove (&new_sleeping_thread->elem);
   lock_release (alarm_lock);
 
-  // Set the value to an 'unset' value.
-  new_alarm->thread->alarm_tick = -1;
-  // intr_set_level (INTR_OFF);
-  free (new_alarm);
-  // intr_set_level (INTR_ON);
+  // Set the value to an 'unset' value and free up the list entry.
+  new_sleeping_thread->thread->alarm_tick = -1;
+  free (new_sleeping_thread);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -218,11 +216,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
 
   struct list_elem* curr;
-  // Loop trough alarms
-
-  for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list); curr = list_next (curr)) {
-    // Extract alarm
-    struct thread_alarm *alarm = list_entry (curr, struct thread_alarm, elem);
+  // Loop through the sleeping threads.
+  for (curr = list_begin (&sleeping_threads); curr != list_end (&sleeping_threads); curr = list_next (curr)) {
+    // Extract list entry
+    struct sleeping_thread *alarm = list_entry (curr, struct sleeping_thread, elem);
     // Check if the thread should be woken
     struct thread *t = alarm->thread;
     if (t->alarm_tick >= 0 && t->alarm_tick <= ticks && t->status == THREAD_BLOCKED) {
