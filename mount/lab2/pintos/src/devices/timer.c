@@ -116,14 +116,23 @@ timer_sleep (int64_t ticks)
   struct blocked_thread *new_thread = malloc (sizeof (struct blocked_thread));
   new_thread->thread = thread_current();
 
+  // Disable interrupts and cache the old interrupt level.
+  enum intr_level old_level = intr_set_level (INTR_OFF);
+
+  // Lock and insert the new element into the list
   lock_acquire(blocked_threads_lock);
   list_push_front (&blocked_threads, new_thread);
   lock_release(blocked_threads_lock);
 
-  // Block the thread
-  enum intr_level old_level = intr_set_level (INTR_OFF);
   thread_block ();
-  intr_set_level (INTR_ON);
+
+  // Lock and remove the element from the list.
+  lock_acquire(blocked_threads_lock);
+  list_remove (new_thread);
+  lock_release(blocked_threads_lock);
+
+  // Reset interrupts to the level before sleeping.
+  intr_set_level (old_level);
 
   // Reset the alarm_tick value to the 'unset' value.
   new_thread->thread->alarm_tick = -1;
@@ -223,10 +232,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
         t->alarm_tick >= 0 &&          // Make sure that the thread has a set tick value.
         ticks >= t->alarm_tick)        // Check if we have reached its wakeup tick.
     {
-      thread_unblock (element->thread);
-      lock_acquire(blocked_threads_lock);
-      list_remove (e);
-      lock_release(blocked_threads_lock);
+      thread_unblock (t);
     }
 
     e = next;
