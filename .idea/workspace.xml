@@ -72,11 +72,6 @@
     <property name="last_opened_file_path" value="$PROJECT_DIR$/../eda387/labs" />
   </component>
   <component name="RunManager">
-    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
-      <method v="2">
-        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="EDA093" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="EDA093" TARGET_NAME="EDA093" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="EDA093" RUN_TARGET_NAME="EDA093">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
