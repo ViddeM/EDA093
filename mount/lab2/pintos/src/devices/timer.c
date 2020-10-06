@@ -98,7 +98,7 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t ticks)
 {
   // Don't do anything if alarm isn't in future
   if (ticks <= 0)
@@ -106,7 +106,7 @@ timer_sleep (int64_t ticks)
       return;
   }
 
-  // Create a new alarm
+  // Set the alarm_tick to the tick we should wake up on.
   thread_current ()->alarm_tick = timer_ticks () + ticks;
 
   struct blocked_thread* new_thread = malloc (sizeof (struct blocked_thread));
@@ -118,6 +118,10 @@ timer_sleep (int64_t ticks)
   thread_block ();
   intr_set_level (INTR_ON);
 
+  // Reset the alarm_tick value to the 'unset' value.
+  t->alarm_tick = -1;
+
+  // Free up the memory of our list entry as it is no longer in the list.
   free (new_thread);
 }
 
@@ -199,7 +203,6 @@ check_alarm (struct thread* t)
     if (t->alarm_tick >= 0 && ticks >= t->alarm_tick)
     {
       thread_unblock (t);
-      t->alarm_tick = -1;
       return 1;
     }
   }
