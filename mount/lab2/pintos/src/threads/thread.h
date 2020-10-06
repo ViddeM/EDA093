@@ -84,6 +84,7 @@ struct thread
   {
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
+
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
@@ -97,6 +98,9 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+
+    /* Owned by devices/timer.c */
+    int alarm_tick;                     /* The tick to wake this thread up on */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

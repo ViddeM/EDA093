@@ -8,8 +8,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include <threads/malloc.h>
-#include <lib/kernel/list.h>
-  
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -22,18 +21,6 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-/* Struct to keep track of thread alarms */
-struct thread_alarm {
-  struct list_elem elem; // to be used with lib/kernel/list.h
-  struct thread* thread;
-  uint32_t alarm_time;
-};
-
-/* List of alarms and a related lock for modifying the list */
-struct list alarm_list;
-static struct lock* alarm_lock;
-
-
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -44,6 +31,13 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+struct list *blocked_threads;
+
+struct blocked_thread {
+    struct list_elem elem;
+    struct thread *thread;
+};
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -51,9 +45,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  alarm_lock = malloc (sizeof (struct lock));
-  lock_init (alarm_lock);
-  list_init (&alarm_list);
+  list_init (&blocked_threads);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -108,37 +100,24 @@ void
 timer_sleep (int64_t sleep_ticks)
 {
   // Don't do anything if alarm isn't in future
-  if (sleep_ticks <= 0) {
+  if (sleep_ticks <= 0)
+  {
       return;
   }
 
-  // Save start time before malloc to get a more accurate timing
-  int64_t start = timer_ticks ();
-
   // Create a new alarm
-  struct thread_alarm* new_alarm = malloc (sizeof (struct thread_alarm));
-  new_alarm->alarm_time = start + sleep_ticks;
-  new_alarm->thread = thread_current ();
+  thread_current ()->alarm_tick = timer_ticks () + sleep_ticks;
 
-  // Add alarm to alarm list
-  lock_acquire (alarm_lock);
-  list_push_back (&alarm_list, new_alarm);
-  lock_release (alarm_lock);
+  struct blocked_thread* new_thread = malloc (sizeof (struct blocked_thread));
+  new_thread->thread = thread_current();
+  list_push_front (&blocked_threads, new_thread);
 
   // Block the thread
-  intr_set_level (INTR_OFF);
+  enum intr_level old_level = intr_set_level (INTR_OFF);
   thread_block ();
   intr_set_level (INTR_ON);
 
-  // Remove alarm from alarm list and free memory after wakeup.
-  lock_acquire (alarm_lock);
-  list_remove (&new_alarm->elem);
-  lock_release (alarm_lock);
-
-  // TODO: Ask supervisor if these are needed / can other threads run while an interrupt is active.
-  // intr_set_level (INTR_OFF);
-  free (new_alarm);
-  // intr_set_level (INTR_ON);
+  free (new_thread);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -211,22 +190,19 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-void
-check_alarm (struct thread* t, void* aux)
+int
+check_alarm (struct thread* t)
 {
-  struct list_elem* curr;
-  // Loop trough alarms
-
-  for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list); curr = list_next (curr)) {
-    // Extract alarm
-    struct thread_alarm *alarm = list_entry (curr, struct thread_alarm, elem);
-    // Check if thread should be woken
-    if (alarm->thread->tid == t->tid && alarm->alarm_time <= ticks && t->status == THREAD_BLOCKED) {
+  if (t->status == THREAD_BLOCKED)
+  {
+    if (t->alarm_tick >= 0 && ticks >= t->alarm_tick)
+    {
       thread_unblock (t);
-      // Let the thread remove itself from the list to prevent any delays in the tick interrupt
-      return; // Only unblock each thread once
+      t->alarm_tick = -1;
+      return 1;
     }
   }
+  return 0;
 }
 
 /* Timer interrupt handler. */
@@ -234,7 +210,21 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_foreach (check_alarm, NULL);
+
+  struct list_elem *e;
+  for (e = list_begin (&blocked_threads);
+       e != list_end (&blocked_threads);)
+  {
+    struct blocked_thread *element = list_entry (e, struct blocked_thread, elem);
+    int unblocked = check_alarm (element->thread);
+
+    struct list_elem *next = list_next (e);
+    if (unblocked) {
+      list_remove(e);
+    }
+    e = next;
+  }
+
   thread_tick ();
 }
 
