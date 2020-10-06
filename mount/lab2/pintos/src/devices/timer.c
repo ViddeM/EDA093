@@ -7,7 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+#include <threads/malloc.h>
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -30,6 +31,15 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* A list of the threads blocked by the timer. */
+struct list *blocked_threads;
+
+/* A list entry to track that a thread is blocked. */
+struct blocked_thread {
+    struct list_elem elem;
+    struct thread *thread;
+};
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +47,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&blocked_threads);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +100,29 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  // Don't do anything if alarm isn't in future
+  if (ticks <= 0)
+  {
+      return;
+  }
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  // Set the alarm_tick to the tick we should wake up on.
+  thread_current ()->alarm_tick = timer_ticks () + ticks;
+
+  struct blocked_thread *new_thread = malloc (sizeof (struct blocked_thread));
+  new_thread->thread = thread_current();
+  list_push_front (&blocked_threads, new_thread);
+
+  // Block the thread
+  enum intr_level old_level = intr_set_level (INTR_OFF);
+  thread_block ();
+  intr_set_level (INTR_ON);
+
+  // Reset the alarm_tick value to the 'unset' value.
+  new_thread->thread->alarm_tick = -1;
+
+  // Free up the memory of our list entry as it is no longer in the list.
+  free (new_thread);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -165,12 +194,35 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+
+  // Loop through all the sleeping threads.
+  struct list_elem *e;
+  for (e = list_begin (&blocked_threads);
+       e != list_end (&blocked_threads);)
+  {
+    struct list_elem *next = list_next (e);
+
+    struct blocked_thread *element = list_entry (e, struct blocked_thread, elem);
+    struct thread *t = element->thread;
+
+    // Check if the thread should wakeup
+    if (t->status == THREAD_BLOCKED && // Make sure the thread is blocked.
+        t->alarm_tick >= 0 &&          // Make sure that the thread has a set tick value.
+        ticks >= t->alarm_tick)        // Check if we have reached its wakeup tick.
+    {
+      thread_unblock (element->thread);
+      list_remove (e);
+    }
+
+    e = next;
+  }
+
   thread_tick ();
 }
 
