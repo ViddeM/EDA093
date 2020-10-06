@@ -40,6 +40,9 @@ struct blocked_thread {
     struct thread *thread;
 };
 
+/* Lock used to access the blocked_threads list. */
+struct lock *blocked_threads_lock;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -48,6 +51,7 @@ timer_init (void)
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
   list_init (&blocked_threads);
+  lock_init (&blocked_threads_lock);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -111,7 +115,10 @@ timer_sleep (int64_t ticks)
 
   struct blocked_thread *new_thread = malloc (sizeof (struct blocked_thread));
   new_thread->thread = thread_current();
+
+  lock_acquire(blocked_threads_lock);
   list_push_front (&blocked_threads, new_thread);
+  lock_release(blocked_threads_lock);
 
   // Block the thread
   enum intr_level old_level = intr_set_level (INTR_OFF);
@@ -217,7 +224,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
         ticks >= t->alarm_tick)        // Check if we have reached its wakeup tick.
     {
       thread_unblock (element->thread);
+      lock_acquire(blocked_threads_lock);
       list_remove (e);
+      lock_release(blocked_threads_lock);
     }
 
     e = next;
