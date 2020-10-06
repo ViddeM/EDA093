@@ -98,7 +98,7 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks)
+timer_sleep (int64_t ticks) 
 {
   // Don't do anything if alarm isn't in future
   if (ticks <= 0)
