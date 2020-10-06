@@ -8,8 +8,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include <threads/malloc.h>
-#include <lib/kernel/list.h>
-  
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -22,18 +21,6 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-/* Struct to keep track of thread alarms */
-struct thread_alarm {
-  struct list_elem elem; // to be used with lib/kernel/list.h
-  struct thread* thread;
-  uint32_t alarm_time;
-};
-
-/* List of alarms and a related lock for modifying the list */
-struct list alarm_list;
-static struct lock* alarm_lock;
-
-
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -44,16 +31,27 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* A list of the threads blocked by the timer. */
+struct list *blocked_threads;
+
+/* A list entry to track that a thread is blocked. */
+struct blocked_thread {
+    struct list_elem elem;
+    struct thread *thread;
+};
+
+/* Lock used to access the blocked_threads list. */
+struct lock *blocked_threads_lock;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
-timer_init (void)
+timer_init (void) 
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  alarm_lock = malloc (sizeof (struct lock));
-  lock_init (alarm_lock);
-  list_init (&alarm_list);
+  list_init (&blocked_threads);
+  lock_init (&blocked_threads_lock);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -101,44 +99,46 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-
-/* Sleeps for approximately TICKS timer sleep_ticks.  Interrupts must
+/* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t sleep_ticks)
+timer_sleep (int64_t ticks) 
 {
   // Don't do anything if alarm isn't in future
-  if (sleep_ticks <= 0) {
+  if (ticks <= 0)
+  {
       return;
   }
 
-  // Save start time before malloc to get a more accurate timing
-  int64_t start = timer_ticks ();
+  // Set the alarm_tick to the tick we should wake up on.
+  thread_current ()->alarm_tick = timer_ticks () + ticks;
 
-  // Create a new alarm
-  struct thread_alarm* new_alarm = malloc (sizeof (struct thread_alarm));
-  new_alarm->alarm_time = start + sleep_ticks;
-  new_alarm->thread = thread_current ();
+  struct blocked_thread *new_thread = malloc (sizeof (struct blocked_thread));
+  new_thread->thread = thread_current();
 
-  // Add alarm to alarm list
-  lock_acquire (alarm_lock);
-  list_push_back (&alarm_list, new_alarm);
-  lock_release (alarm_lock);
+  // Disable interrupts and cache the old interrupt level.
+  enum intr_level old_level = intr_set_level (INTR_OFF);
 
-  // Block the thread
-  intr_set_level (INTR_OFF);
+  // Lock and insert the new element into the list
+  lock_acquire(blocked_threads_lock);
+  list_push_front (&blocked_threads, new_thread);
+  lock_release(blocked_threads_lock);
+
   thread_block ();
-  intr_set_level (INTR_ON);
 
-  // Remove alarm from alarm list and free memory after wakeup.
-  lock_acquire (alarm_lock);
-  list_remove (&new_alarm->elem);
-  lock_release (alarm_lock);
+  // Lock and remove the element from the list.
+  lock_acquire(blocked_threads_lock);
+  list_remove (new_thread);
+  lock_release(blocked_threads_lock);
 
-  // TODO: Ask supervisor if these are needed / can other threads run while an interrupt is active.
-  // intr_set_level (INTR_OFF);
-  free (new_alarm);
-  // intr_set_level (INTR_ON);
+  // Reset interrupts to the level before sleeping.
+  intr_set_level (old_level);
+
+  // Reset the alarm_tick value to the 'unset' value.
+  new_thread->thread->alarm_tick = -1;
+
+  // Free up the memory of our list entry as it is no longer in the list.
+  free (new_thread);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -211,30 +211,33 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-void
-check_alarm (struct thread* t, void* aux)
-{
-  struct list_elem* curr;
-  // Loop trough alarms
-
-  for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list); curr = list_next (curr)) {
-    // Extract alarm
-    struct thread_alarm *alarm = list_entry (curr, struct thread_alarm, elem);
-    // Check if thread should be woken
-    if (alarm->thread->tid == t->tid && alarm->alarm_time <= ticks && t->status == THREAD_BLOCKED) {
-      thread_unblock (t);
-      // Let the thread remove itself from the list to prevent any delays in the tick interrupt
-      return; // Only unblock each thread once
-    }
-  }
-}
-
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_foreach (check_alarm, NULL);
+
+  // Loop through all the sleeping threads.
+  struct list_elem *e;
+  for (e = list_begin (&blocked_threads);
+       e != list_end (&blocked_threads);)
+  {
+    struct list_elem *next = list_next (e);
+
+    struct blocked_thread *element = list_entry (e, struct blocked_thread, elem);
+    struct thread *t = element->thread;
+
+    // Check if the thread should wakeup
+    if (t->status == THREAD_BLOCKED && // Make sure the thread is blocked.
+        t->alarm_tick >= 0 &&          // Make sure that the thread has a set tick value.
+        ticks >= t->alarm_tick)        // Check if we have reached its wakeup tick.
+    {
+      thread_unblock (t);
+    }
+
+    e = next;
+  }
+
   thread_tick ();
 }
 

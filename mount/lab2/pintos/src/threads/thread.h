@@ -98,6 +98,9 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
+    /* Owned by devices/timer.c */
+    int alarm_tick;                     /* The tick to wake this thread up on */
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
