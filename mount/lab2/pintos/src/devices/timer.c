@@ -26,7 +26,6 @@ static int64_t ticks;
 struct thread_alarm {
   struct list_elem elem; // to be used with lib/kernel/list.h
   struct thread* thread;
-  uint32_t alarm_time;
 };
 
 /* List of alarms and a related lock for modifying the list */
@@ -117,8 +116,8 @@ timer_sleep (int64_t sleep_ticks)
 
   // Create a new alarm
   struct thread_alarm* new_alarm = malloc (sizeof (struct thread_alarm));
-  new_alarm->alarm_time = start + sleep_ticks;
   new_alarm->thread = thread_current ();
+  new_alarm->thread->alarm_tick = start + sleep_ticks;
 
   // Add alarm to alarm list
   lock_acquire (alarm_lock);
@@ -135,7 +134,8 @@ timer_sleep (int64_t sleep_ticks)
   list_remove (&new_alarm->elem);
   lock_release (alarm_lock);
 
-  // TODO: Ask supervisor if these are needed / can other threads run while an interrupt is active.
+  // Set the value to an 'unset' value.
+  new_alarm->thread->alarm_tick = -1;
   // intr_set_level (INTR_OFF);
   free (new_alarm);
   // intr_set_level (INTR_ON);
@@ -225,7 +225,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     struct thread_alarm *alarm = list_entry (curr, struct thread_alarm, elem);
     // Check if the thread should be woken
     struct thread *t = alarm->thread;
-    if (alarm->thread->tid == t->tid && alarm->alarm_time <= ticks && t->status == THREAD_BLOCKED) {
+    if (t->alarm_tick >= 0 && t->alarm_tick <= ticks && t->status == THREAD_BLOCKED) {
       thread_unblock (t);
       // Let the thread remove itself from the list to prevent any delays in the tick interrupt
     }
