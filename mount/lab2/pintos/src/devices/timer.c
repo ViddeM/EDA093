@@ -195,20 +195,6 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Check */
-int
-check_alarm (struct thread* t)
-{
-  if (t->status == THREAD_BLOCKED)
-  {
-    if (t->alarm_tick >= 0 && ticks >= t->alarm_tick)
-    {
-      return 1;
-    }
-  }
-  return 0;
-}
-
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
