@@ -119,7 +119,7 @@ timer_sleep (int64_t ticks)
   intr_set_level (INTR_ON);
 
   // Reset the alarm_tick value to the 'unset' value.
-  t->alarm_tick = -1;
+  new_thread->thread->alarm_tick = -1;
 
   // Free up the memory of our list entry as it is no longer in the list.
   free (new_thread);
@@ -195,6 +195,7 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+/* Check */
 int
 check_alarm (struct thread* t)
 {
@@ -202,7 +203,6 @@ check_alarm (struct thread* t)
   {
     if (t->alarm_tick >= 0 && ticks >= t->alarm_tick)
     {
-      thread_unblock (t);
       return 1;
     }
   }
@@ -215,17 +215,25 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
 
+  // Loop through all the sleeping threads.
   struct list_elem *e;
   for (e = list_begin (&blocked_threads);
        e != list_end (&blocked_threads);)
   {
-    struct blocked_thread *element = list_entry (e, struct blocked_thread, elem);
-    int unblocked = check_alarm (element->thread);
-
     struct list_elem *next = list_next (e);
-    if (unblocked) {
+
+    struct blocked_thread *element = list_entry (e, struct blocked_thread, elem);
+    struct thread *t = element->thread;
+
+    // Check if the thread should wakeup
+    if (t->status == THREAD_BLOCKED && // Make sure the thread is blocked.
+        t->alarm_tick >= 0 &&          // Make sure that the thread has a set tick value.
+        ticks >= t->alarm_tick)        // Check if we have reached its wakeup tick.
+    {
+      thread_unblock (element->thread);
       list_remove (e);
     }
+
     e = next;
   }
 
