@@ -33,6 +33,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 
 struct list *blocked_threads;
 
+/*  */
 struct blocked_thread {
     struct list_elem elem;
     struct thread *thread;
@@ -41,7 +42,7 @@ struct blocked_thread {
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
-timer_init (void) 
+timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
@@ -97,16 +98,16 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer sleep_ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t sleep_ticks)
+timer_sleep (int64_t ticks)
 {
   // Don't do anything if alarm isn't in future
-  if (sleep_ticks <= 0)
+  if (ticks <= 0)
   {
       return;
   }
 
   // Create a new alarm
-  thread_current ()->alarm_tick = timer_ticks () + sleep_ticks;
+  thread_current ()->alarm_tick = timer_ticks () + ticks;
 
   struct blocked_thread* new_thread = malloc (sizeof (struct blocked_thread));
   new_thread->thread = thread_current();
