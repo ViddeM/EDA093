@@ -211,30 +211,26 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-void
-check_alarm (struct thread* t, void* aux)
+/* Timer interrupt handler. */
+static void
+timer_interrupt (struct intr_frame *args UNUSED)
 {
+  ticks++;
+
   struct list_elem* curr;
   // Loop trough alarms
 
   for (curr = list_begin (&alarm_list); curr != list_end (&alarm_list); curr = list_next (curr)) {
     // Extract alarm
     struct thread_alarm *alarm = list_entry (curr, struct thread_alarm, elem);
-    // Check if thread should be woken
+    // Check if the thread should be woken
+    struct thread *t = alarm->thread;
     if (alarm->thread->tid == t->tid && alarm->alarm_time <= ticks && t->status == THREAD_BLOCKED) {
       thread_unblock (t);
       // Let the thread remove itself from the list to prevent any delays in the tick interrupt
-      return; // Only unblock each thread once
     }
   }
-}
 
-/* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED)
-{
-  ticks++;
-  thread_foreach (check_alarm, NULL);
   thread_tick ();
 }
 
