@@ -9,15 +9,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0cf128a-5c49-4fff-a256-cf3b9d8191fd" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/devices/timer.c" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/devices/timer.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/backtrace" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/backtrace" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-gdb" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-gdb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-mkdisk" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-mkdisk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-set-cmdline" beforeDir="false" afterPath="$PROJECT_DIR$/lab2/pintos/src/utils/pintos-set-cmdline" afterDir="false" />
-    </list>
+    <list default="true" id="d0cf128a-5c49-4fff-a256-cf3b9d8191fd" name="Default Changelist" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -58,7 +50,7 @@
       <updated>1601387679514</updated>
       <workItem from="1601387680612" duration="469000" />
       <workItem from="1601762968514" duration="56000" />
-      <workItem from="1601912614145" duration="1967000" />
+      <workItem from="1601912614145" duration="2024000" />
     </task>
     <servers />
   </component>

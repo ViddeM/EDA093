@@ -220,7 +220,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
     struct list_elem *next = list_next (e);
     if (unblocked) {
-      list_remove(e);
+      list_remove (e);
     }
     e = next;
   }
