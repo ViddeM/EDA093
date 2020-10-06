@@ -109,7 +109,7 @@ timer_sleep (int64_t ticks)
   // Set the alarm_tick to the tick we should wake up on.
   thread_current ()->alarm_tick = timer_ticks () + ticks;
 
-  struct blocked_thread* new_thread = malloc (sizeof (struct blocked_thread));
+  struct blocked_thread *new_thread = malloc (sizeof (struct blocked_thread));
   new_thread->thread = thread_current();
   list_push_front (&blocked_threads, new_thread);
 
