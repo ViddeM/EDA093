@@ -31,9 +31,10 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* A list of the threads blocked by the timer. */
 struct list *blocked_threads;
 
-/*  */
+/* A list entry to track that a thread is blocked. */
 struct blocked_thread {
     struct list_elem elem;
     struct thread *thread;
