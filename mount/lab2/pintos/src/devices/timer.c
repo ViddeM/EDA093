@@ -30,7 +30,7 @@ struct sleeping_thread {
 
 /* List of the sleeping threads and a related lock for modifying the list */
 struct list sleeping_threads;
-static struct lock* alarm_lock;
+static struct lock* sleeping_threads_lock;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -49,8 +49,8 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  alarm_lock = malloc (sizeof (struct lock));
-  lock_init (alarm_lock);
+  sleeping_threads_lock = malloc (sizeof (struct lock));
+  lock_init (sleeping_threads_lock);
   list_init (&sleeping_threads);
 }
 
@@ -120,9 +120,9 @@ timer_sleep (int64_t sleep_ticks)
   new_sleeping_thread->thread->alarm_tick = start + sleep_ticks;
 
   // Block and add list entry to the list of sleeping threads.
-  lock_acquire (alarm_lock);
+  lock_acquire (sleeping_threads_lock);
   list_push_back (&sleeping_threads, new_sleeping_thread);
-  lock_release (alarm_lock);
+  lock_release (sleeping_threads_lock);
 
   // Block the thread.
   intr_set_level (INTR_OFF);
@@ -130,9 +130,9 @@ timer_sleep (int64_t sleep_ticks)
   intr_set_level (INTR_ON);
 
   // Remove the entry from the list.
-  lock_acquire (alarm_lock);
+  lock_acquire (sleeping_threads_lock);
   list_remove (&new_sleeping_thread->elem);
-  lock_release (alarm_lock);
+  lock_release (sleeping_threads_lock);
 
   // Set the value to an 'unset' value and free up the list entry.
   new_sleeping_thread->thread->alarm_tick = -1;
