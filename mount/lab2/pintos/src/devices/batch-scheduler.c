@@ -6,7 +6,9 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "lib/random.h" //generate random numbers
+#include "timer.h"
 
 #define BUS_CAPACITY 3
 #define SENDER 0
@@ -37,16 +39,20 @@ void oneTask(task_t task);/*Task requires to use the bus and executes methods be
 	void transferData(task_t task); /* task processes data on the bus either sending or receiving based on the direction*/
 	void leaveSlot(task_t task); /* task release the slot */
 
-
+struct lock lock;
+int bus_direction;
+int running_tasks;
+int waiting_tasks[2];
+struct condition waiting_tasks_conds[2];
 
 /* initializes semaphores */ 
 void init_bus(void){ 
  
-    random_init((unsigned int)123456789); 
-    
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    random_init((unsigned int)123456789);
 
+    lock_init(&lock);
+    cond_init(&waiting_tasks_conds[SENDER]);
+    cond_init(&waiting_tasks_conds[RECEIVER]);
 }
 
 /*
@@ -116,20 +122,35 @@ void oneTask(task_t task) {
 /* task tries to get slot on the bus subsystem */
 void getSlot(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    lock_acquire(&lock);
+
+    while ((running_tasks == 3) || (running_tasks == 0 && bus_direction != task.direction)) {
+        waiting_tasks[task.direction]++;
+        cond_wait(&waiting_tasks_conds[task.direction], &lock);
+        waiting_tasks[task.direction]--;
+    }
+
+    running_tasks++;
+    bus_direction = task.direction;
+    lock_release(&lock);
 }
 
 /* task processes data on the bus send/receive */
 void transferData(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    timer_sleep(random_ulong());
 }
 
 /* task releases the slot */
 void leaveSlot(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    lock_acquire(&lock);
+
+    if (waiting_tasks[task.direction] > 0) {
+        cond_signal(&waiting_tasks_conds[task.direction], &lock);
+    } else if (running_tasks == 0) {
+        cond_broadcast(&waiting_tasks_conds[1 - task.direction], &lock);
+    }
+
+    lock_release(&lock);
 }
