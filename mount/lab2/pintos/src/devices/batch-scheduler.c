@@ -42,17 +42,18 @@ void oneTask(task_t task);/*Task requires to use the bus and executes methods be
 struct lock lock;
 int bus_direction;
 int running_tasks;
-int waiting_tasks[2];
-struct condition waiting_tasks_conds[2];
+int waiting_tasks[2][2];
+struct condition waiting_tasks_conds[2][2];
 
 /* initializes semaphores */ 
-void init_bus(void){ 
- 
+void init_bus(void){
     random_init((unsigned int)123456789);
 
     lock_init(&lock);
-    cond_init(&waiting_tasks_conds[SENDER]);
-    cond_init(&waiting_tasks_conds[RECEIVER]);
+    cond_init(&waiting_tasks_conds[NORMAL][SENDER]);
+    cond_init(&waiting_tasks_conds[NORMAL][RECEIVER]);
+    cond_init(&waiting_tasks_conds[HIGH][SENDER]);
+    cond_init(&waiting_tasks_conds[HIGH][RECEIVER]);
 }
 
 /*
@@ -124,10 +125,10 @@ void getSlot(task_t task)
 {
     lock_acquire(&lock);
 
-    while ((running_tasks == 3) || (running_tasks == 0 && bus_direction != task.direction)) {
-        waiting_tasks[task.direction]++;
-        cond_wait(&waiting_tasks_conds[task.direction], &lock);
-        waiting_tasks[task.direction]--;
+    while ((running_tasks == 3) || (running_tasks > 0 && bus_direction != task.direction)) {
+        waiting_tasks[task.priority][task.direction]++;
+        cond_wait(&waiting_tasks_conds[task.priority][task.direction], &lock);
+        waiting_tasks[task.priority][task.direction]--;
     }
 
     running_tasks++;
@@ -146,10 +147,16 @@ void leaveSlot(task_t task)
 {
     lock_acquire(&lock);
 
-    if (waiting_tasks[task.direction] > 0) {
-        cond_signal(&waiting_tasks_conds[task.direction], &lock);
+    running_tasks--;
+    int other_dir = 1 - task.direction;
+
+    if (waiting_tasks[HIGH][task.direction] > 0) {
+        cond_signal(&waiting_tasks_conds[HIGH][task.direction], &lock);
+    } else if (waiting_tasks[HIGH][other_dir] == 0 && waiting_tasks[NORMAL][task.direction] > 0) {
+        cond_signal(&waiting_tasks_conds[NORMAL][task.direction], &lock);
     } else if (running_tasks == 0) {
-        cond_broadcast(&waiting_tasks_conds[1 - task.direction], &lock);
+        cond_broadcast(&waiting_tasks_conds[HIGH][other_dir], &lock);
+        cond_broadcast(&waiting_tasks_conds[NORMAL][other_dir], &lock);
     }
 
     lock_release(&lock);
