@@ -125,7 +125,11 @@ void getSlot(task_t task)
 {
     lock_acquire(&lock);
 
-    while ((running_tasks == 3) || (running_tasks > 0 && bus_direction != task.direction)) {
+    while (
+        running_tasks == 3 ||
+        running_tasks > 0 && bus_direction != task.direction ||
+        waiting_tasks[HIGH][1 - task.direction] > 0
+    ) {
         waiting_tasks[task.priority][task.direction]++;
         cond_wait(&waiting_tasks_conds[task.priority][task.direction], &lock);
         waiting_tasks[task.priority][task.direction]--;
