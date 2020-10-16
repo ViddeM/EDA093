@@ -6,7 +6,9 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "lib/random.h" //generate random numbers
+#include "timer.h"
 
 #define BUS_CAPACITY 3
 #define SENDER 0
@@ -37,16 +39,21 @@ void oneTask(task_t task);/*Task requires to use the bus and executes methods be
 	void transferData(task_t task); /* task processes data on the bus either sending or receiving based on the direction*/
 	void leaveSlot(task_t task); /* task release the slot */
 
-
+struct lock lock; // Lock for reading and/or modifying the below variables.
+int bus_direction; // The current direction that data is transfered in.
+int running_tasks; // The current number of tasks transfering data.
+int waiting_tasks[2][2]; // The number of waiting tasks in each direction, first dimension is for priority, the second is for direction.
+struct condition waiting_tasks_conds[2][2]; // Conditional variables for the waiting_tasks.
 
 /* initializes semaphores */ 
-void init_bus(void){ 
- 
-    random_init((unsigned int)123456789); 
-    
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+void init_bus(void){
+    random_init((unsigned int)123456789);
 
+    lock_init(&lock);
+    cond_init(&waiting_tasks_conds[NORMAL][SENDER]);
+    cond_init(&waiting_tasks_conds[NORMAL][RECEIVER]);
+    cond_init(&waiting_tasks_conds[HIGH][SENDER]);
+    cond_init(&waiting_tasks_conds[HIGH][RECEIVER]);
 }
 
 /*
@@ -116,20 +123,51 @@ void oneTask(task_t task) {
 /* task tries to get slot on the bus subsystem */
 void getSlot(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    lock_acquire(&lock);
+
+    while (                                                                     // Wait while:
+        running_tasks == 3 ||                                                   // * There are no slots available...
+        (running_tasks > 0 && bus_direction != task.direction) ||               // * The current direction isn't our own...
+        (task.priority != HIGH && waiting_tasks[HIGH][1 - task.direction] > 0)  // * We are not high priority and there are
+                                                                                //   high priority tasks in the other direction.
+    ) {
+        waiting_tasks[task.priority][task.direction]++;                         // Add ourselves to the waiting counter.
+        cond_wait(&waiting_tasks_conds[task.priority][task.direction], &lock);  // Add ourselves to the queue.
+        waiting_tasks[task.priority][task.direction]--;                         // Remove ourselves from the waiting counter.
+    }
+
+    running_tasks++; // Increase the number of tasks currently transfering data.
+    bus_direction = task.direction; // Set the direction of transfer to our direction.
+    lock_release(&lock);
 }
 
 /* task processes data on the bus send/receive */
 void transferData(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    timer_sleep(random_ulong()); // Sleep for a random amount of time.
 }
 
 /* task releases the slot */
 void leaveSlot(task_t task) 
 {
-    msg("NOT IMPLEMENTED");
-    /* FIXME implement */
+    lock_acquire(&lock);
+
+    running_tasks--; // We are no longer transfering data and so decrease the number of tasks transfering data.
+    int other_dir = 1 - task.direction;
+
+    if (waiting_tasks[HIGH][task.direction] > 0) {
+        // Signal high priority tasks in our direction if there are any.
+        cond_signal(&waiting_tasks_conds[HIGH][task.direction], &lock);
+    } else if (waiting_tasks[HIGH][other_dir] == 0 && waiting_tasks[NORMAL][task.direction] > 0) {
+        // Signal normal priority tasks in our direction if there are no high priority tasks in the opposite direction.
+        cond_signal(&waiting_tasks_conds[NORMAL][task.direction], &lock);
+    }
+
+    // Broadcast the opposite by priority if there are no tasks still transfering data in our direction.
+    if (running_tasks == 0) {
+        cond_broadcast(&waiting_tasks_conds[HIGH][other_dir], &lock);
+        cond_broadcast(&waiting_tasks_conds[NORMAL][other_dir], &lock);
+    }
+
+    lock_release(&lock);
 }
